@@ -11,6 +11,7 @@ import {
   Warehouse,
   POPickup,
   SpecialRequest,
+  KBOrder,
 } from '../types';
 import {
   INITIAL_CLIENTS,
@@ -23,6 +24,7 @@ import {
   INITIAL_WAREHOUSES,
   INITIAL_PO_PICKUPS,
   INITIAL_SPECIAL_REQUESTS,
+  INITIAL_KB_ORDERS,
 } from '../data/mockData';
 
 // Local storage keys to persist state across user interactions
@@ -37,6 +39,7 @@ const STORAGE_KEYS = {
   WAREHOUSES: 'Dispatch_Planning_warehouses',
   PO_PICKUPS: 'Dispatch_Planning_po_pickups',
   SPECIAL_REQUESTS: 'Dispatch_Planning_special_requests',
+  KB_ORDERS: 'Dispatch_Planning_kb_orders',
 };
 
 function getStored<T>(key: string, defaultVal: T): T {
@@ -68,6 +71,7 @@ class DispatchDataService {
   private warehouses: Warehouse[] = getStored(STORAGE_KEYS.WAREHOUSES, INITIAL_WAREHOUSES);
   private poPickups: POPickup[] = getStored(STORAGE_KEYS.PO_PICKUPS, INITIAL_PO_PICKUPS);
   private specialRequests: SpecialRequest[] = getStored(STORAGE_KEYS.SPECIAL_REQUESTS, INITIAL_SPECIAL_REQUESTS);
+  private kbOrders: KBOrder[] = getStored(STORAGE_KEYS.KB_ORDERS, INITIAL_KB_ORDERS);
 
   private listeners: Array<() => void> = [];
 
@@ -224,6 +228,107 @@ class DispatchDataService {
       setStored(STORAGE_KEYS.SPECIAL_REQUESTS, this.specialRequests);
       this.notify();
     }
+  }
+
+  // ==========================================
+  // KB ORDERS MANAGEMENT
+  // ==========================================
+
+  public getKBOrders(): KBOrder[] {
+    return [...this.kbOrders];
+  }
+
+  public getPendingKBOrders(): KBOrder[] {
+    return this.kbOrders.filter((o) => o.status === 'PENDING');
+  }
+
+  public getCompletedKBOrders(): KBOrder[] {
+    return this.kbOrders.filter((o) => o.status === 'COMPLETED');
+  }
+
+  public addKBOrder(order: Omit<KBOrder, 'id' | 'status'> & { status?: 'PENDING' | 'COMPLETED' }): KBOrder {
+    const newId = `KB-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const isCompleted = !!(order.challanNo && order.challanNo.trim() !== '');
+    const status: 'PENDING' | 'COMPLETED' = isCompleted ? 'COMPLETED' : (order.status || 'PENDING');
+    const newOrder: KBOrder = {
+      ...order,
+      id: newId,
+      status,
+    };
+    this.kbOrders = [newOrder, ...this.kbOrders];
+    setStored(STORAGE_KEYS.KB_ORDERS, this.kbOrders);
+    this.addNotification({
+      title: `New KB Order ${newOrder.orderNo}`,
+      message: `Order for ${newOrder.partyName} (${newOrder.itemName}) added.`,
+      type: 'INFO',
+    });
+    this.notify();
+    return newOrder;
+  }
+
+  public updateKBOrderChallan(id: string, challanNo: string): boolean {
+    const idx = this.kbOrders.findIndex((o) => o.id === id);
+    if (idx !== -1) {
+      const isCompleted = !!(challanNo && challanNo.trim() !== '');
+      this.kbOrders[idx] = {
+        ...this.kbOrders[idx],
+        challanNo: challanNo.trim(),
+        status: isCompleted ? 'COMPLETED' : 'PENDING',
+      };
+      setStored(STORAGE_KEYS.KB_ORDERS, this.kbOrders);
+      this.notify();
+      return true;
+    }
+    return false;
+  }
+
+  public updateKBOrdersChallanByPI(piNo: string, challanNo: string): number {
+    let updatedCount = 0;
+    const isCompleted = !!(challanNo && challanNo.trim() !== '');
+    this.kbOrders = this.kbOrders.map((o) => {
+      if (o.piNo.trim().toLowerCase() === piNo.trim().toLowerCase()) {
+        updatedCount++;
+        return {
+          ...o,
+          challanNo: challanNo.trim(),
+          status: isCompleted ? 'COMPLETED' : 'PENDING',
+        };
+      }
+      return o;
+    });
+    if (updatedCount > 0) {
+      setStored(STORAGE_KEYS.KB_ORDERS, this.kbOrders);
+      this.addNotification({
+        title: `Challan Mapped for PI: ${piNo}`,
+        message: `Challan ${challanNo} linked to ${updatedCount} items. Status: ${isCompleted ? 'COMPLETED' : 'PENDING'}.`,
+        type: 'SUCCESS',
+      });
+      this.notify();
+    }
+    return updatedCount;
+  }
+
+  public updateKBOrderStatus(id: string, status: 'PENDING' | 'COMPLETED'): void {
+    const idx = this.kbOrders.findIndex((o) => o.id === id);
+    if (idx !== -1) {
+      this.kbOrders[idx] = {
+        ...this.kbOrders[idx],
+        status,
+      };
+      setStored(STORAGE_KEYS.KB_ORDERS, this.kbOrders);
+      this.notify();
+    }
+  }
+
+  public deleteKBOrder(id: string): boolean {
+    const idx = this.kbOrders.findIndex((o) => o.id === id);
+    if (idx !== -1) {
+      this.kbOrders = this.kbOrders.filter((o) => o.id !== id);
+      setStored(STORAGE_KEYS.KB_ORDERS, this.kbOrders);
+      this.notify();
+      return true;
+    }
+    return false;
   }
 
   // ==========================================

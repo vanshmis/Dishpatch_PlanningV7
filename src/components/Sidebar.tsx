@@ -29,10 +29,18 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentPath, onNavigate }) => {
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const unsub = dispatchService.subscribe(() => setTick((t) => t + 1));
+    return () => unsub();
+  }, []);
+
   const pendingCount = dispatchService.getPendingPIs().length;
   const todaysCount = dispatchService.getTodaysDispatches().length;
   const poPickupCount = dispatchService.getPOPickups().filter((p) => p.status === 'PENDING').length;
   const specialReqCount = dispatchService.getSpecialRequests().filter((r) => r.status === 'PENDING').length;
+  const kbOrdersCount = dispatchService.getPendingKBOrders().length;
 
   const [moreOpen, setMoreOpen] = useState(() => {
     const morePaths = [
@@ -116,8 +124,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPath, onNavigate }) => 
       label: 'Kb Orders',
       path: '/kb-orders',
       icon: ShoppingBag,
-      badge: undefined as string | undefined,
-      badgeColor: '',
+      badge: kbOrdersCount > 0 ? String(kbOrdersCount) : undefined,
+      badgeColor: 'bg-amber-400 text-slate-950 font-bold',
     },
     {
       id: 'upcoming-planning',

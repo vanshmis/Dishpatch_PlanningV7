@@ -200,3 +200,18 @@ export interface SpecialRequest {
   workDoneAt?: string;
 }
 
+export interface KBOrder {
+  id: string;
+  timestamp: string;
+  piNo: string;
+  partyName: string;
+  orderNo: string;
+  itemName: string;
+  qty: number;
+  amount: number;
+  billingAddress: string;
+  supplyNameAddress: string;
+  challanNo?: string;
+  status: 'PENDING' | 'COMPLETED';
+}
+
